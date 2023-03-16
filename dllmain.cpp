@@ -19,14 +19,29 @@ char path[256];
 int file_index = 1;
 
 bool consoleEnabled;
+bool loggingEnabled;
+
+void WriteDebugLog(const char *text){
+	FILE *file = fopen(".\\ModuleLoader.log", "a");
+	if (file != NULL){
+		fputs(text, file);
+		fputs("\n", file);
+		fclose(file);
+	}
+}
 
 void ReadConfigs(){
 	char buffer[32];
 
 	GetPrivateProfileStringA("common", "DisplayConsole", "off", buffer, 32, ".\\ModuleLoader.ini");
-
 	if (!strcmp(buffer, "on")){
 		consoleEnabled = true;
+	}
+
+	GetPrivateProfileStringA("common", "WriteLog", "off", buffer, 32, ".\\ModuleLoader.ini");
+	if (!strcmp(buffer, "on")){
+		loggingEnabled = true;
+		remove(".\\ModuleLoader.log");
 	}
 
 	GetPrivateProfileStringA("INSTALL", "base", ".", base_install, 256, ".\\truck.ini");
@@ -34,9 +49,9 @@ void ReadConfigs(){
 
 //05DC1B0
 char* GetFullPath(char *subPath) {
-	if (!strcmp(base_install, ".\\")){
-		memset(path, 0, 256);
-	} else {
+	memset(path, 0, 256);
+
+	if (strcmp(base_install, ".\\")){
 		strcpy(path, base_install);
 	}
 
@@ -51,16 +66,15 @@ DWORD* LoadAndInitGameModule(char *modulePath, char *b3dName, char *resName){
 }
 
 DWORD *__cdecl LoadGameModule(const char *path, const char *name){
-    char *modulePath = new char[];
+    char modulePath[255];
 
-	char *b3dName = new char[];
-	char *resName = new char[];
-    char *m_sPath = new char[];
+	char b3dName[128];
+	char resName[128];
 
 	DWORD MemState = *(DWORD*)0x6CED90; //видимо, параметр качества текстур
 	DWORD* result; //указатель на загруженный игровой модуль
 
-    strcpy(m_sPath, path);
+    //strcpy(m_sPath, path);
 
     strcpy(b3dName, name);
     strcat(b3dName, ".b3d");
@@ -106,10 +120,19 @@ DWORD *__cdecl LoadGameModule(const char *path, const char *name){
 	}
 
 
+	//modulePath = GetFullPath((char *)path); //иногда возвращает неправильный путь?
+
+	strcpy(modulePath, GetFullPath((char *)path));
+
+	if (loggingEnabled){
+		char buffer[255];
+		sprintf(buffer, "%d. Loading %s, %s ->\nmodulePath=%s, b3dName=%s, resName=%s\n", file_index, path, name, modulePath, b3dName, resName);
+		WriteDebugLog(buffer);
+	}
+
 	cout << file_index << ". Loading """ << path << """, """ << name << """" << endl;
 	file_index++;
 
-	modulePath = GetFullPath(m_sPath); //иногда возвращает неправильный путь?
 	result = LoadAndInitGameModule(modulePath, b3dName, resName);
 
 	return result;
@@ -134,6 +157,8 @@ void LoadAdditionalModules(){
 }
 
 DWORD *__cdecl LoadGameResources(const char *path, const char *name){
+	DWORD *result;
+
 	//в стандартной игре сначала загружается модуль common,
 	//затем cabines и следом trucks
 
@@ -142,11 +167,13 @@ DWORD *__cdecl LoadGameResources(const char *path, const char *name){
 		cout << "\n\n\n";
 	}
 
-	if (!strcmp(name, "cabines")){ //подгрузка модулей из ini
-		LoadAdditionalModules();   //сразу перед cabines
+	result = LoadGameModule(path, name);
+
+	if (!strcmp(name, "trucks")){  //подгрузка модулей из ini
+		LoadAdditionalModules();   //сразу после trucks
 	}
 
-	return LoadGameModule(path, name);
+	return result;
 }
 
 void DisplayConsole(){
@@ -169,7 +196,7 @@ void AttachHooks(){
     DetourAttach(&(LPVOID&)addr_LoadGameResource, &LoadGameResources);
     DetourTransactionCommit();
     //cout << "Hooks attached!" << endl;
-	cout << "ModuleLoader v1.01 (2023.03.16) started." << endl;
+	cout << "ModuleLoader v1.02 (16.03.2023) started." << endl;
 }
 	
 BOOL WINAPI DllMain(HINSTANCE hinstDLL,DWORD fdwReason,LPVOID lpvReserved)
