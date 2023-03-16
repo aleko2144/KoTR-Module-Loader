@@ -9,27 +9,56 @@
 
 using namespace std;
 
-char* GetFullPath(char *subPath){
-	DWORD* TheGame_addr = (DWORD*)(*(DWORD*)0x696CC0);
-	typedef char* (__thiscall * GetFullPath)(DWORD* _this, char *subPath);
-	return GetFullPath(0x5DC1B0)(TheGame_addr, subPath);
+char file_path[256];
+char file_name[256];
+char section[32];
+
+char base_install[256];
+char path[256];
+
+int iter = 1;
+
+bool consoleEnabled;
+
+void ReadConfigs(){
+	char buffer[32];
+
+	GetPrivateProfileStringA("common", "DisplayConsole", "off", buffer, 32, ".\\ModuleLoader.ini");
+
+	if (!strcmp(buffer, "on")){
+		consoleEnabled = true;
+	}
+
+	GetPrivateProfileStringA("INSTALL", "base", ".", base_install, 256, ".\\truck.ini");
+}
+
+//05DC1B0
+char* GetFullPath(char *subPath) {
+	if (!strcmp(base_install, ".\\")){
+		memset(path, 0, 256);
+	} else {
+		strcpy(path, base_install);
+	}
+
+	strcat(path, subPath);
+	return path;
 }
 
 DWORD* LoadAndInitGameModule(char *modulePath, char *b3dName, char *resName){
 	DWORD* TheGame_addr = (DWORD*)(*(DWORD*)0x696CC0);
-	typedef DWORD* (__thiscall * GetFullPath)(DWORD* _this, char *modulePath, char *b3dName, char *resName);
-	return GetFullPath(0x5DAE10)(TheGame_addr, modulePath, b3dName, resName);
+	typedef DWORD* (__thiscall * LoadAndInitGameModule)(DWORD* _this, char *modulePath, char *b3dName, char *resName);
+	return LoadAndInitGameModule(0x5DAE10)(TheGame_addr, modulePath, b3dName, resName);
 }
 
-DWORD *__cdecl LoadGameResource(const char *path, const char *name){
+DWORD *__cdecl LoadGameModule(const char *path, const char *name){
     char *modulePath = new char[];
 
 	char *b3dName = new char[];
 	char *resName = new char[];
     char *m_sPath = new char[];
 
-	DWORD MemState = *(DWORD*)0x6CED90; //видимо, параметр качества текстур
-	DWORD* result; //указатель на загруженный игровой модуль
+	DWORD MemState = *(DWORD*)0x6CED90; //РІРёРґРёРјРѕ, РїР°СЂР°РјРµС‚СЂ РєР°С‡РµСЃС‚РІР° С‚РµРєСЃС‚СѓСЂ
+	DWORD* result; //СѓРєР°Р·Р°С‚РµР»СЊ РЅР° Р·Р°РіСЂСѓР¶РµРЅРЅС‹Р№ РёРіСЂРѕРІРѕР№ РјРѕРґСѓР»СЊ
 
     strcpy(m_sPath, path);
 
@@ -38,11 +67,11 @@ DWORD *__cdecl LoadGameResource(const char *path, const char *name){
 
 	strcpy(resName, name);
 
-	//это определение названия архива с текстурами
-	//*.res - самое высокое качество, *2.res - самое низкое (*3.res для trucks)
+	//СЌС‚Рѕ РѕРїСЂРµРґРµР»РµРЅРёРµ РЅР°Р·РІР°РЅРёСЏ Р°СЂС…РёРІР° СЃ С‚РµРєСЃС‚СѓСЂР°РјРё
+	//*.res - СЃР°РјРѕРµ РІС‹СЃРѕРєРѕРµ РєР°С‡РµСЃС‚РІРѕ, *2.res - СЃР°РјРѕРµ РЅРёР·РєРѕРµ (*3.res РґР»СЏ trucks)
 	switch (MemState){
 	case 0:
-		//если trucks, то *3.res
+		//РµСЃР»Рё trucks, С‚Рѕ *3.res
 		if(!strcmp(resName, "trucks")){
 			strcat(resName, "3.res");
 		} else {
@@ -50,7 +79,7 @@ DWORD *__cdecl LoadGameResource(const char *path, const char *name){
 		}
 		break;
 	case 1:
-		//если trucks, то *2.res
+		//РµСЃР»Рё trucks, С‚Рѕ *2.res
 		if(!strcmp(resName, "trucks")){
 			strcat(resName, "2.res");
 		} else {
@@ -61,7 +90,7 @@ DWORD *__cdecl LoadGameResource(const char *path, const char *name){
 		strcat(resName, "1.res");
 		break;
 	case 3:
-		//если trucks, то *1.res
+		//РµСЃР»Рё trucks, С‚Рѕ *1.res
 		if(!strcmp(resName, "trucks")){
 			strcat(resName, "1.res");
 		} else {
@@ -77,20 +106,16 @@ DWORD *__cdecl LoadGameResource(const char *path, const char *name){
 	}
 
 
-	cout << "LoadGameRes(" << path << ", " << name << ")" << ": b3dName=" << b3dName << ", resName=" << resName << endl;
+	cout << "LoadGameModule(" << path << ", " << name << "):" << endl << "b3dName=" << b3dName << ", resName=" << resName << endl << endl;
 
-	modulePath = GetFullPath(m_sPath); //иногда возвращает неправильный путь?
+	modulePath = GetFullPath(m_sPath); //РёРЅРѕРіРґР° РІРѕР·РІСЂР°С‰Р°РµС‚ РЅРµРїСЂР°РІРёР»СЊРЅС‹Р№ РїСѓС‚СЊ?
 	result = LoadAndInitGameModule(modulePath, b3dName, resName);
 
 	return result;
 }
 
-void LoadAdditionalResources(){
-    char file_path[256];
-    char file_name[256];
-    char section[32];
-
-    int iter = 1;
+void LoadAdditionalModules(){
+	iter = 1;
 
     while(true){
         sprintf(section, "FILE_%d", iter);
@@ -103,19 +128,19 @@ void LoadAdditionalResources(){
             break;
         }
 
-        LoadGameResource(file_path, file_name);
+        LoadGameModule(file_path, file_name);
     }
 }
 
 DWORD *__cdecl LoadGameResources(const char *path, const char *name){
-	//в стандартной игре сначала загружается модуль common,
-	//затем cabines и следом trucks
+	//РІ СЃС‚Р°РЅРґР°СЂС‚РЅРѕР№ РёРіСЂРµ СЃРЅР°С‡Р°Р»Р° Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ РјРѕРґСѓР»СЊ common,
+	//Р·Р°С‚РµРј cabines Рё СЃР»РµРґРѕРј trucks
 
-	if (!strcmp(name, "cabines")){ //подгрузка модулей из ini
-		LoadAdditionalResources(); //сразу перед cabines
+	if (!strcmp(name, "cabines")){ //РїРѕРґРіСЂСѓР·РєР° РјРѕРґСѓР»РµР№ РёР· ini
+		LoadAdditionalModules(); //СЃСЂР°Р·Сѓ РїРµСЂРµРґ cabines
 	}
 
-	return LoadGameResource(path, name);
+	return LoadGameModule(path, name);
 }
 
 void DisplayConsole(){
@@ -125,11 +150,11 @@ void DisplayConsole(){
 	freopen("conout$","w",stderr);
 	SetConsoleCP(1251);
 	SetConsoleOutputCP(1251);
-	cout << "Mod debug window started" << endl;
+	//cout << "Mod debug window started" << endl;
 }
 
 void AttachHooks(){
-    cout << "Try to attach hooks" << endl;
+    //cout << "Try to attach hooks" << endl;
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
 
@@ -137,19 +162,7 @@ void AttachHooks(){
 
     DetourAttach(&(LPVOID&)addr_LoadGameResource, &LoadGameResources);
     DetourTransactionCommit();
-    cout << "Hooks attached!" << endl;
-}
-
-bool consoleEnabled;
-
-void ReadConfig(){
-	char buffer[32];
-
-	GetPrivateProfileStringA("common", "DisplayConsole", "off", buffer, 32, ".\\ModuleLoader.ini");
-
-	if (!strcmp(buffer, "on")){
-		consoleEnabled = true;
-	}
+    //cout << "Hooks attached!" << endl;
 }
 	
 BOOL WINAPI DllMain(HINSTANCE hinstDLL,DWORD fdwReason,LPVOID lpvReserved)
@@ -159,7 +172,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL,DWORD fdwReason,LPVOID lpvReserved)
 	{
 		case DLL_PROCESS_ATTACH:
 		{
-			ReadConfig();
+			ReadConfigs();
 
 			if (consoleEnabled){
 				DisplayConsole();
