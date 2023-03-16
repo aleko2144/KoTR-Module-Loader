@@ -5,7 +5,11 @@
 Огромная благодарность Voron295 и [Duude92](https://github.com/Duude92).
 
 ### Использование
-ModuleLoader.ini:
+1. Распаковать файлы в папку с игрой версии 8.2.
+2. Установить [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (скопировать файл dsound.dll в папку с игрой).
+3. Готово!
+
+### ModuleLoader.ini:
 ```
 [FILE_<индекс>]
 path = путь к модулю (с двумя обратными косыми, например, "vehicles\\")
