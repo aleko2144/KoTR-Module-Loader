@@ -16,7 +16,7 @@ char section[32];
 char base_install[256];
 char path[256];
 
-int iter = 1;
+int file_index = 1;
 
 bool consoleEnabled;
 
@@ -106,7 +106,8 @@ DWORD *__cdecl LoadGameModule(const char *path, const char *name){
 	}
 
 
-	cout << "LoadGameModule(" << path << ", " << name << "):" << endl << "b3dName=" << b3dName << ", resName=" << resName << endl << endl;
+	cout << file_index << ". Loading """ << path << """, """ << name << """" << endl;
+	file_index++;
 
 	modulePath = GetFullPath(m_sPath); //иногда возвращает неправильный путь?
 	result = LoadAndInitGameModule(modulePath, b3dName, resName);
@@ -115,7 +116,7 @@ DWORD *__cdecl LoadGameModule(const char *path, const char *name){
 }
 
 void LoadAdditionalModules(){
-	iter = 1;
+	int iter = 1;
 
     while(true){
         sprintf(section, "FILE_%d", iter);
@@ -136,8 +137,13 @@ DWORD *__cdecl LoadGameResources(const char *path, const char *name){
 	//в стандартной игре сначала загружается модуль common,
 	//затем cabines и следом trucks
 
+	if (!strcmp(name, "common") && file_index != 1){ //сброс вывода на экран,
+		file_index = 1;                              //если загрузка начата заново
+		cout << "\n\n\n";
+	}
+
 	if (!strcmp(name, "cabines")){ //подгрузка модулей из ini
-		LoadAdditionalModules(); //сразу перед cabines
+		LoadAdditionalModules();   //сразу перед cabines
 	}
 
 	return LoadGameModule(path, name);
@@ -163,6 +169,7 @@ void AttachHooks(){
     DetourAttach(&(LPVOID&)addr_LoadGameResource, &LoadGameResources);
     DetourTransactionCommit();
     //cout << "Hooks attached!" << endl;
+	cout << "ModuleLoader v1.01 (2023.03.16) started." << endl;
 }
 	
 BOOL WINAPI DllMain(HINSTANCE hinstDLL,DWORD fdwReason,LPVOID lpvReserved)
